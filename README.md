@@ -1,3 +1,5 @@
+<img src="./docs/logo_small.png" alt="StackHack" width="300"/>
+
 # StackHack
 
 `TODO` Add proper details
