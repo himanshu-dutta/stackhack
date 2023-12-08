@@ -5,6 +5,8 @@ name = "pypi"
 
 [packages]
 requests = "*"
+python-dotenv = "*"
+ipykernel = "*"
 
 [dev-packages]
 
