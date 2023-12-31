@@ -5,9 +5,6 @@ from pathlib import Path
 import os
 from bs4 import BeautifulSoup
 
-# the available data
-# question, answer, relevant kg
-
 
 def parse_html(html_text: str):
     soup = BeautifulSoup(html_text, "html.parser")
@@ -15,7 +12,7 @@ def parse_html(html_text: str):
 
 
 class KGQA_Item:
-    def __init__(self, ques, kg, ans):
+    def __init__(self, ques, kg, ans=""):
         self.ques = ques
         self.kg = kg
         self.ans = ans
@@ -27,10 +24,12 @@ class KGQA_Item:
         return st
 
     def gen_datapoint(self):
-        return {
+        datapoint = {
             "input": f"QUESTION: {self.ques}, CONTEXT: {self._stringify_kg()}",
-            "output": self.ans,
         }
+        if self.ans != "":
+            datapoint.update({"output": self.ans})
+        return datapoint
 
 
 def preprocess(doc: dict, kg: dict, threshold: int):
@@ -50,7 +49,7 @@ def preprocess(doc: dict, kg: dict, threshold: int):
             parse_html(ques), kg, parse_html(ans["body"])
         ).gen_datapoint()
         for ans in answers
-        if int(ans["up_vote_count"]) > 0
+        if int(ans["up_vote_count"]) - int(ans["down_vote_count"]) > 0
     }
     return datapoints
 

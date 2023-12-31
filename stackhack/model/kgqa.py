@@ -1,22 +1,31 @@
 import datasets
 import argparse
-from transformers import AutoTokenizer
 from transformers import (
-    AutoModelForSeq2SeqLM,
+    AutoTokenizer,
+    T5ForConditionalGeneration,
     DataCollatorForSeq2Seq,
     Seq2SeqTrainingArguments,
     Seq2SeqTrainer,
 )
+import os
+import random
 
 MODEL_CHECKPOINT_OPTIONS = ["t5-small", "t5-base", "t5-large", "t5-3b", "t5-11b"]
 
 
-def load_dataset(dataset_path: str, train_pct: float, valid_pct: float):
+def load_dataset(
+    dataset_path: str, data_frac: float, train_pct: float, valid_pct: float
+):
     assert (
         train_pct + valid_pct < 1.0
     ), "Can't have more than 100% of the data in the splits"
 
-    dataset = datasets.load_dataset("json", data_dir=dataset_path)
+    data_perc = int(data_frac * 100)
+    all_files = os.listdir(dataset_path)
+    num_files_to_load = int(len(all_files) * (data_perc / 100))
+    selected_files = random.sample(all_files, num_files_to_load)
+    data_files = [os.path.join(dataset_path, file) for file in selected_files]
+    dataset = datasets.load_dataset("json", data_files=data_files)
 
     valid_pct = valid_pct / (1 - train_pct)
     train_testval_ds = dataset["train"].train_test_split(test_size=1.0 - train_pct)
@@ -39,10 +48,12 @@ def make_preprocess_function(tokenizer, max_target_length=512):
 
         model_inputs = tokenizer(
             inputs,
-            max_length=max([len(inp) for inp in inputs]),
+            max_length=max_target_length,
+            # max_length=max([len(inp) for inp in inputs]),
             return_tensors="pt",
             padding="max_length",
-            truncation=False,
+            truncation=True
+            # truncation=False
         )
 
         # Setup the tokenizer for targets
@@ -61,6 +72,7 @@ def make_preprocess_function(tokenizer, max_target_length=512):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--data_dir", type=str, required=True)
+    parser.add_argument("-f", "--data_frac", type=float, default=1.0)
     parser.add_argument(
         "-c",
         "--checkpoint",
@@ -81,14 +93,15 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     data_dir = args.data_dir
+    data_frac = args.data_frac
     model_checkpoint = args.checkpoint
     max_target_length = args.max_target_length
     model_save_path = args.model_save_path
 
     tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
-    model = AutoModelForSeq2SeqLM.from_pretrained(model_checkpoint)
+    model = T5ForConditionalGeneration.from_pretrained(model_checkpoint)
 
-    raw_datasets = load_dataset(data_dir, 0.7, 0.2)
+    raw_datasets = load_dataset(data_dir, data_frac, 0.7, 0.2)
     tokenized_datasets = raw_datasets.map(
         make_preprocess_function(tokenizer, max_target_length), batched=True
     )
